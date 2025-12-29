@@ -3,47 +3,51 @@ import pandas as pd
 from transformers import pipeline
 import plotly.express as px
 
-# --- 1. Page Config ---
-st.set_page_config(page_title="Brand Reputation 2023", layout="wide")
+# --- 1. Page Configuration ---
+st.set_page_config(page_title="Brand Reputation Dashboard", layout="wide")
 
-# --- 2. Cache AI Model (Saves memory) ---
+# --- 2. Lightweight AI Model Loading ---
 @st.cache_resource
 def load_sentiment_model():
-    # Using a small, efficient model to stay within Render's free RAM limits
-    return pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+    # This model is ~80MB, perfect for Render's 512MB RAM limit
+    return pipeline(
+        "sentiment-analysis", 
+        model="cross-encoder/ms-marco-MiniLM-L-2-v2"
+    )
 
-# --- 3. Load Scraped Data ---
+# --- 3. Data Loading ---
 @st.cache_data
 def load_data():
-    # Ensure this CSV is in the same folder as app.py
-    df = pd.read_csv("scraped_data.csv")
-    df['Date'] = pd.to_datetime(df['Date'])
-    return df
+    try:
+        df = pd.read_csv("scraped_data.csv")
+        df['Date'] = pd.to_datetime(df['Date'])
+        return df
+    except Exception as e:
+        st.error(f"Error loading CSV: {e}")
+        return pd.DataFrame()
 
-# Initialize Data and Model
-try:
-    df = load_data()
-    sentiment_analyzer = load_sentiment_model()
-except Exception as e:
-    st.error(f"Error loading data or model: {e}")
-    st.stop()
+# Initialize app data
+df = load_data()
 
 # --- 4. Sidebar Navigation ---
-st.sidebar.title("Navigation")
-menu = st.sidebar.radio("Go to:", ["📦 Product Catalog", "⭐ 2023 Sentiment Analysis"])
+st.sidebar.title("🔍 Project Menu")
+page = st.sidebar.radio("Navigate to:", ["Product Catalog", "2023 Sentiment Analysis"])
 
 # --- 5. Page: Product Catalog ---
-if menu == "📦 Product Catalog":
-    st.title("Product Catalog")
-    st.write("List of products extracted from the sandbox environment.")
+if page == "Product Catalog":
+    st.title("📦 Scraped Product Catalog")
+    st.write("This data was extracted live from the sandbox environment.")
     
     product_df = df[df['Type'] == 'Product']
-    st.dataframe(product_df[['Title', 'Content']], use_container_width=True)
+    if not product_df.empty:
+        st.dataframe(product_df[['Title', 'Content']], use_container_width=True)
+    else:
+        st.warning("No product data found in CSV.")
 
 # --- 6. Page: Sentiment Analysis ---
 else:
-    st.title("⭐ 2023 Review Sentiment Analysis")
-    st.write("Use the slider to analyze customer sentiment for specific months in 2023.")
+    st.title("⭐ 2023 Customer Sentiment Analysis")
+    st.write("Analyze monthly trends using AI (MiniLM Transformer).")
 
     # Month Slider (Mandatory Requirement)
     months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -53,36 +57,49 @@ else:
         format_func=lambda x: months[x-1]
     )
 
-    # Filtering data for the selected month
-    mask = (df['Type'] == 'Review') & (df['Date'].dt.month == selected_month_num)
-    filtered_df = df[mask].copy()
+    # Filter data for selected month
+    month_data = df[(df['Type'] == 'Review') & (df['Date'].dt.month == selected_month_num)].copy()
 
-    if filtered_df.empty:
-        st.warning(f"No reviews available for {months[selected_month_num-1]} 2023.")
+    if month_data.empty:
+        st.info(f"No reviews recorded for {months[selected_month_num-1]} 2023.")
     else:
-        # Run AI Sentiment Analysis
-        with st.spinner("Analyzing sentiments..."):
-            results = sentiment_analyzer(filtered_df['Content'].tolist())
-            filtered_df['Sentiment'] = [res['label'] for res in results]
-            filtered_df['Score'] = [round(res['score'], 3) for res in results]
-
-        # Visualization
-        col1, col2 = st.columns([1, 1])
+        st.write(f"Found **{len(month_data)}** reviews for this period.")
         
-        with col1:
-            st.subheader("Sentiment Distribution")
-            fig = px.pie(
-                filtered_df, 
-                names='Sentiment', 
-                color='Sentiment',
-                color_discrete_map={'POSITIVE':'#00CC96', 'NEGATIVE':'#EF553B'}
-            )
-            st.plotly_chart(fig, use_container_width=True)
+        # Action Button to save RAM
+        if st.button("🚀 Run AI Analysis"):
+            with st.spinner("AI is processing text..."):
+                try:
+                    classifier = load_sentiment_model()
+                    # Run analysis
+                    texts = month_data['Content'].tolist()
+                    results = classifier(texts)
+                    
+                    # MiniLM scores: higher score usually indicates better match/positivity
+                    # We map the score to a binary label for the chart
+                    month_data['Sentiment'] = ["POSITIVE" if r['score'] > 0 else "NEGATIVE" for r in results]
+                    
+                    # --- Visualizations ---
+                    col1, col2 = st.columns([1, 1])
+                    
+                    with col1:
+                        st.subheader("Sentiment Split")
+                        fig = px.pie(
+                            month_data, 
+                            names='Sentiment', 
+                            color='Sentiment',
+                            hole=0.4,
+                            color_discrete_map={'POSITIVE':'#2ecc71', 'NEGATIVE':'#e74c3c'}
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
 
-        with col2:
-            st.subheader("Data Details")
-            st.dataframe(filtered_df[['Content', 'Sentiment', 'Score']], use_container_width=True)
+                    with col2:
+                        st.subheader("Extracted Insights")
+                        st.table(month_data[['Content', 'Sentiment']])
+                        
+                except Exception as e:
+                    st.error("The AI model ran out of memory. Try a different month or refresh.")
 
 # --- Footer ---
 st.sidebar.markdown("---")
-st.sidebar.info("Project for Economics & Data Science. Scraped from web-scraping.dev.")
+st.sidebar.caption("📊 **Economics & Data Science Assignment**")
+st.sidebar.caption("Deployed on Render (Free Tier)")
