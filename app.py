@@ -88,14 +88,20 @@ else:
                     col1, col2 = st.columns([1, 1])
                     
                     with col1:
-                        st.subheader("Sentiment Split")
-                        fig = px.pie(
-                            month_data, 
-                            names='Sentiment', 
+                        st.subheader("Review Volume by Sentiment")
+                        # Creating a summary dataframe for the bar chart
+                        sentiment_counts = month_data['Sentiment'].value_counts().reset_index()
+                        sentiment_counts.columns = ['Sentiment', 'Count']
+                        
+                        fig = px.bar(
+                            sentiment_counts, 
+                            x='Sentiment', 
+                            y='Count',
                             color='Sentiment',
-                            hole=0.4,
+                            text='Count',
                             color_discrete_map={'POSITIVE':'#2ecc71', 'NEGATIVE':'#e74c3c'}
                         )
+                        fig.update_traces(textposition='outside')
                         st.plotly_chart(fig, use_container_width=True)
 
                     with col2:
@@ -107,5 +113,5 @@ else:
 
 # --- Footer ---
 st.sidebar.markdown("---")
-st.sidebar.caption("📊 **Economics & Data Science Assignment**")
+st.sidebar.caption("📊 **Data Mining Assignment**")
 st.sidebar.caption("Deployed on Render (Free Tier)")
