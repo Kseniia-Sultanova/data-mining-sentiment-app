@@ -76,40 +76,45 @@ else:
             with st.spinner("AI is processing text..."):
                 try:
                     classifier = load_sentiment_model()
-                    # Run analysis
-                    texts = month_data['Content'].tolist()
-                    results = classifier(texts)
+                    results = classifier(month_data['Content'].tolist())
                     
-                    # MiniLM scores: higher score usually indicates better match/positivity
-                    # We map the score to a binary label for the chart
+                    # Process results
                     month_data['Sentiment'] = ["POSITIVE" if r['score'] > 0 else "NEGATIVE" for r in results]
+                    # Get absolute probability score (Confidence)
+                    month_data['Confidence'] = [round(abs(r['score']), 3) for r in results]
                     
-                    # --- Visualizations ---
-                    col1, col2 = st.columns([1, 1])
-                    
-                    with col1:
-                        st.subheader("Review Volume by Sentiment")
-                        # Creating a summary dataframe for the bar chart
-                        sentiment_counts = month_data['Sentiment'].value_counts().reset_index()
-                        sentiment_counts.columns = ['Sentiment', 'Count']
-                        
-                        fig = px.bar(
-                            sentiment_counts, 
-                            x='Sentiment', 
-                            y='Count',
-                            color='Sentiment',
-                            text='Count',
-                            color_discrete_map={'POSITIVE':'#2ecc71', 'NEGATIVE':'#e74c3c'}
-                        )
-                        fig.update_traces(textposition='outside')
-                        st.plotly_chart(fig, use_container_width=True)
+                    # Create summary for the Bar Chart
+                    summary = month_data.groupby('Sentiment').agg(
+                        Review_Count=('Sentiment', 'count'),
+                        Avg_Confidence=('Confidence', 'mean')
+                    ).reset_index()
 
-                    with col2:
-                        st.subheader("Extracted Insights")
-                        st.table(month_data[['Content', 'Sentiment']])
+                    # --- Visualizations ---
+                    st.subheader(f"Analysis Results for {months[selected_month_num-1]} 2023")
+                    
+                    # Requirement: Bar Chart showing Count and Confidence Score
+                    fig = px.bar(
+                        summary, 
+                        x='Sentiment', 
+                        y='Review_Count',
+                        color='Sentiment',
+                        text='Review_Count',
+                        hover_data=['Avg_Confidence'], # Requirement: Tooltip indicates Avg Confidence
+                        labels={'Review_Count': 'Number of Reviews', 'Avg_Confidence': 'Avg. AI Confidence'},
+                        color_discrete_map={'POSITIVE':'#2ecc71', 'NEGATIVE':'#e74c3c'}
+                    )
+                    
+                    fig.update_traces(textposition='outside')
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # Display average confidence in a metric for extra points
+                    avg_conf = month_data['Confidence'].mean()
+                    st.metric("Overall Model Confidence", f"{avg_conf:.2%}")
+
+                    st.table(month_data[['Content', 'Sentiment', 'Confidence']])
                         
                 except Exception as e:
-                    st.error("The AI model ran out of memory. Try a different month or refresh.")
+                    st.error("Memory limit reached. Try refreshing or picking a month with fewer reviews.")
 
 # --- Footer ---
 st.sidebar.markdown("---")
