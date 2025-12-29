@@ -1,7 +1,13 @@
 import streamlit as st
 import pandas as pd
+import transformers
 from transformers import pipeline
 import plotly.express as px
+
+# Force check if pipeline is available
+if not hasattr(transformers, 'pipeline'):
+    st.error("Library initialization error. Please refresh the page.")
+    st.stop()
 
 # --- 1. Page Configuration ---
 st.set_page_config(page_title="Brand Reputation Dashboard", layout="wide")
