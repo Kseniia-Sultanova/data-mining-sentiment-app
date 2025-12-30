@@ -37,11 +37,11 @@ df = load_data()
 
 # --- 4. Sidebar Navigation ---
 st.sidebar.title("🔍 Project Menu")
-page = st.sidebar.radio("Navigate to:", ["Product Catalog", "2023 Sentiment Analysis"])
+page = st.sidebar.radio("Navigate to:", ["Product Catalog and Testimonials", "Reviews"])
 
 # --- 5. Page: Product Catalog ---
-if page == "Product Catalog":
-    st.title("📦 Scraped Product Catalog")
+if page == "Product Catalog and Testimonials":
+    st.title("📦 Scraped Product Catalog and Testimonials")
     st.write("This data was extracted live from the sandbox environment.")
     
     product_df = df[df['Type'] == 'Product']
@@ -119,4 +119,4 @@ else:
 # --- Footer ---
 st.sidebar.markdown("---")
 st.sidebar.caption("📊 **Data Mining Assignment**")
-st.sidebar.caption("Deployed on Render (Free Tier)")
+st.sidebar.caption("Deployed on Render")
